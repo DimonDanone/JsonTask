@@ -16,6 +16,14 @@ namespace JsonReading {
         return data_int;
     }
 
+    double JsonData::GetDoubleData() const {
+        if (type != JsonType::JDOUBLE) {
+            throw JsonException("this json_data type is not double\n");
+        }
+
+        return data_double;
+    }
+
     bool JsonData::GetBoolData() const {
         if (type != JsonType::JBOOLEAN) {
             throw JsonException("this json_data type is not bool\n");
@@ -24,7 +32,7 @@ namespace JsonReading {
         return data_bool;
     }
 
-    string JsonData::GetStringData() const {
+    const string& JsonData::GetStringData() const {
         if (type != JsonType::JSTRING) {
             throw JsonException("this json_data type is not string\n");
         }
@@ -32,6 +40,17 @@ namespace JsonReading {
         return data_str;
     }
 
+    void DeleteSpacesFromString(string& str) {
+        int start = 0;
+        while (str[start] == ' ') {
+            start++;
+        }
+
+        str = str.substr(start, str.size() - start);
+        while(str.size() > 0 && str.back() == ' ') {
+            str.pop_back();
+        }
+    }
 
     //JsonReader definition
     JsonReader::JsonReader(const string &json_file_path)
@@ -41,8 +60,12 @@ namespace JsonReading {
         }
 
         for (string now_row; getline(json_file, now_row);) {
+            //Delete "{ " and " }", now working without empty {}
+            now_row = now_row.substr(1, now_row.size() - 2);
+            DeleteSpacesFromString(now_row);
+
             lines_count++;
-            lines_keys.emplace_back();
+            //lines_keys.emplace_back(); !!!!!!!!!
             json_lines.emplace_back();
             //"{key1:val1,key2:val2}" ->  { "key1:val1", "key2:val2" }
             vector<string> json_datas = SplitBySeparator(now_row, ", ");
@@ -51,26 +74,25 @@ namespace JsonReading {
                 // "key:value" -> {"key", "val"}
                 vector<string> key_val = SplitBySeparator(json_datas[i], ":");
 
-                //delete {} from json record
-                if (key_val[0].front() == '{') {
-                    key_val[0] = key_val[0].substr(1, key_val[0].size() - 1);
-                }
-                if (key_val.back().back() == '}') {
-                    key_val.back() = key_val.back().substr(0, key_val.back().size() - 1);
-                }
-
                 string key = key_val[0];
                 string val = key_val[1];
-                lines_keys.back()[key] = i + 1;
+                DeleteSpacesFromString(key);
+                DeleteSpacesFromString(val);
+
+                if (!lines_keys.count(key)) {
+                    lines_keys[key] = lines_keys.size() + 1;
+                }
 
                 JsonType data_type = FindJsonTypeFromString(val);
                 if (data_type == JsonType::JBOOLEAN) {
-                    bool bool_value = (val[0] == 'T');
-                    json_lines.back()[i + 1] = JsonData(bool_value);
+                    bool bool_value = (val[0] == 'T' || val[0] == 't');
+                    json_lines.back()[lines_keys[key]] = JsonData(bool_value);
                 } else if (data_type == JsonType::JINTEGER) {
-                    json_lines.back()[i + 1] = JsonData(stoi(val));
+                    json_lines.back()[lines_keys[key]] = JsonData(stoi(val));
+                } else if (data_type == JsonType::JDOUBLE) {
+                    json_lines.back()[lines_keys[key]] = JsonData(stod(val));
                 } else {
-                    json_lines.back()[i + 1] = JsonData(val);
+                    json_lines.back()[lines_keys[key]] = JsonData(val);
                 }
             }
         }
@@ -79,17 +101,21 @@ namespace JsonReading {
     }
 
     JsonType JsonReader::FindJsonTypeFromString(const string &str) {
-        if (str[0] == 'T' || str[0] == 'F') {
-            return JsonType::JBOOLEAN;
+        if (str[0] == '\"') {
+            return JsonType::JSTRING;
         } else if (str[0] >= '0' && str[0] <= '9') {
+            if (str.find('.') != string::npos) {
+                return JsonType::JDOUBLE;
+            }
+
             return JsonType::JINTEGER;
         }
 
-        return JsonType::JSTRING;
+        return JsonType::JBOOLEAN;
     }
 
-    const JsonKeysLinesMap& JsonReader::GetKeysMapForLine(int index) const {
-        return lines_keys[index];
+    const JsonKeysMap& JsonReader::GetKeysMap() const {
+        return lines_keys;
     }
 
     const JsonLinesMap& JsonReader::GetJsonLine(int index) const {

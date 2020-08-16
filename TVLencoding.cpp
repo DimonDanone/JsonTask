@@ -1,23 +1,21 @@
 #include "TLVencoding.h"
+#include <cstring>
 
 using namespace std;
 
 namespace TLVencoding {
     //Encoder
     ofstream& TLVencoder::EncodeJsonKeysToFile(ofstream& output) {
-        for (int i = 0; i < json_reader.GetLinesCount(); ++i) {
-            for (const auto& [key, val] : json_reader.GetKeysMapForLine(i)) {
-                vector<unsigned char> key_bytes = GetByteImageString(key);
-                for (int j = 0; j < key_bytes.size(); ++j) {
-                    output << key_bytes[j];
-                }
-
-                vector<unsigned char> val_bytes = GetByteImageInt(val);
-                for (int j = 0; j < val_bytes.size(); ++j) {
-                    output << val_bytes[j];
-                }
+        for (const auto& [key, val] : json_reader.GetKeysMap()) {
+            vector<unsigned char> key_bytes = GetByteImageString(key);
+            for (int j = 0; j < key_bytes.size(); ++j) {
+                output << key_bytes[j];
             }
-            output << new_line_tag;
+
+            vector<unsigned char> val_bytes = GetByteImageInt(val);
+            for (int j = 0; j < val_bytes.size(); ++j) {
+                output << val_bytes[j];
+            }
         }
 
         return output;
@@ -43,11 +41,27 @@ namespace TLVencoding {
     }
 
     vector<unsigned char> TLVencoder::GetByteImageInt(int val) {
-        vector<unsigned char> result(5);
+        vector<unsigned char> result(sizeof(int) + 1);
 
         result[0] = integer_tag;
-        for (int i = 0; i < 4; ++i) {
-            result[4 - i] = val >> (i * 8);
+        for (int i = 0; i < sizeof(int); ++i) {
+            result[sizeof(int) - i] = val >> (i * 8);
+        }
+
+        return result;
+    }
+
+    std::vector<unsigned char> TLVencoder::GetByteImageDouble(double val) {
+        vector<unsigned char> result(sizeof(double) + 1);
+
+        result[0] = double_tag;
+
+        unsigned char byteBuffer[sizeof(double)];
+        *(double*)byteBuffer = val;
+
+        //double ans = *(double*)byteArray;
+        for (int i = 0; i < sizeof(double); ++i) {
+            result[i + 1] = byteBuffer[i];
         }
 
         return result;
@@ -63,17 +77,17 @@ namespace TLVencoding {
     }
 
     vector<unsigned char> TLVencoder::GetByteImageString(const string& s) {
-        vector<unsigned char> result(s.size() + 5);
+        vector<unsigned char> result(s.size() + sizeof(int) + 1);
 
         result[0] = string_tag;
         //I think, I need to add size_t bytes image for string size
         vector<unsigned char> s_size_int_bytes = GetByteImageInt(s.size());
-        for (int i = 1; i < 5; ++i) {
+        for (int i = 1; i < sizeof(int) + 1; ++i) {
             result[i] = s_size_int_bytes[i];
         }
 
         for (int i = 0; i < s.size(); ++i) {
-            result[i + 5] = s[i];
+            result[i + sizeof(int) + 1] = s[i];
         }
 
         return result;
@@ -84,27 +98,24 @@ namespace TLVencoding {
             return GetByteImageInt(data.GetIntData());
         } else if (data.GetJsonDataType() == JsonReading::JsonType::JBOOLEAN) {
             return GetByteImageBool(data.GetBoolData());
+        } else if (data.GetJsonDataType() == JsonReading::JsonType::JDOUBLE) {
+            return GetByteImageDouble(data.GetDoubleData());
         }
 
         return GetByteImageString(data.GetStringData());
     }
 
     //Decoder
-    vector<JsonReading::JsonKeysLinesMap> TLVdecoder::DecodeJsonKeysFromFile(std::ifstream& input) {
-        vector<JsonReading::JsonKeysLinesMap> result;
+    JsonReading::JsonKeysMap TLVdecoder::DecodeJsonKeysFromFile(std::ifstream& input) {
+        JsonReading::JsonKeysMap result;
 
         vector<DecodedData> all_data = DecodeFile(input);
 
         if (!all_data.empty()) {
-            result.emplace_back();
             for (int i = 0; i < all_data.size() - 1; ++i) {
                 DecodedData key = all_data[i];
-                if (key.GetType() == DecodedTypes::DENDL) {
-                    result.emplace_back();
-                } else {
-                    DecodedData val = all_data[++i];
-                    result.back()[key.GetStringData()] = val.GetIntData();
-                }
+                DecodedData val = all_data[++i];
+                result[key.GetStringData()] = val.GetIntData();
             }
         }
 
@@ -128,6 +139,8 @@ namespace TLVencoding {
                         result.back()[key.GetIntData()] = JsonReading::JsonData(val.GetBoolData());
                     } else if (val.GetType() == DecodedTypes::DECODED_INT) {
                         result.back()[key.GetIntData()] = JsonReading::JsonData(val.GetIntData());
+                    } else if (val.GetType() == DecodedTypes::DECODED_DOUBLE) {
+                        result.back()[key.GetIntData()] = JsonReading::JsonData(val.GetDoubleData());
                     } else {
                         result.back()[key.GetIntData()] = JsonReading::JsonData(val.GetStringData());
                     }
@@ -154,9 +167,11 @@ namespace TLVencoding {
             if (type == bool_tag) {
                 all_data.push_back(GetBoolFromBytes(ReadBytes(input, 1)));
             } else if (type == integer_tag) {
-                all_data.push_back(GetIntFromBytes(ReadBytes(input, 4)));
+                all_data.push_back(GetIntFromBytes(ReadBytes(input, sizeof(int))));
+            } else if (type == double_tag) {
+                all_data.push_back(GetDoubleFromBytes(ReadBytes(input, sizeof(double))));
             } else {
-                int string_size = GetIntFromBytes(ReadBytes(input, 4));
+                int string_size = GetIntFromBytes(ReadBytes(input, sizeof(int)));
                 all_data.push_back(GetStringFromBytes(ReadBytes(input, string_size)));
             }
         }
@@ -194,6 +209,18 @@ namespace TLVencoding {
             result = result << 8;
             result |= bytes[i];
         }
+
+        return result;
+    }
+
+    double TLVdecoder::GetDoubleFromBytes(const std::vector<unsigned char>& bytes) {
+        double result;
+
+        unsigned char byteBuffer[sizeof(double)];
+        for (int i = 0; i < sizeof(double); ++i) {
+            byteBuffer[i] = bytes[i];
+        }
+        result = *(double*)byteBuffer;
 
         return result;
     }

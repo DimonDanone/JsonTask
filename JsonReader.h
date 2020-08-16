@@ -70,13 +70,13 @@ namespace JsonReading {
 
     };
 
-    using JsonLinesMap = std::unordered_map<int64_t, JsonData>;
+    using JsonLinePairs = std::vector<std::pair<int64_t, JsonData>>;
     using JsonKeysMap = std::unordered_map<std::string, int64_t>;
 
     class JsonReader {
     private:
         std::ifstream json_file;
-        std::vector<JsonLinesMap> json_lines;
+        std::vector<JsonLinePairs> json_lines;
         JsonKeysMap lines_keys;
 
         int lines_count = 0;
@@ -85,7 +85,7 @@ namespace JsonReading {
         explicit JsonReader(const std::string& json_file_path);
 
         const JsonKeysMap& GetKeysMap() const;
-        const JsonLinesMap& GetJsonLine(int index) const;
+        const JsonLinePairs& GetJsonLine(int index) const;
 
         int GetLinesCount() const { return lines_count; }
 

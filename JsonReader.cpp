@@ -86,13 +86,13 @@ namespace JsonReading {
                 JsonType data_type = FindJsonTypeFromString(val);
                 if (data_type == JsonType::JBOOLEAN) {
                     bool bool_value = (val[0] == 'T' || val[0] == 't');
-                    json_lines.back()[lines_keys[key]] = JsonData(bool_value);
+                    json_lines.back().push_back(make_pair(lines_keys[key], JsonData(bool_value)));
                 } else if (data_type == JsonType::JINTEGER) {
-                    json_lines.back()[lines_keys[key]] = JsonData(stoi(val));
+                    json_lines.back().push_back(make_pair(lines_keys[key], JsonData(stoi(val))));
                 } else if (data_type == JsonType::JDOUBLE) {
-                    json_lines.back()[lines_keys[key]] = JsonData(stod(val));
+                    json_lines.back().push_back(make_pair(lines_keys[key], JsonData(stod(val))));
                 } else {
-                    json_lines.back()[lines_keys[key]] = JsonData(val);
+                    json_lines.back().push_back(make_pair(lines_keys[key], JsonData(val)));
                 }
             }
         }
@@ -118,7 +118,7 @@ namespace JsonReading {
         return lines_keys;
     }
 
-    const JsonLinesMap& JsonReader::GetJsonLine(int index) const {
+    const JsonLinePairs& JsonReader::GetJsonLine(int index) const {
         return json_lines[index];
     }
 

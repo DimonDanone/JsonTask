@@ -122,8 +122,8 @@ namespace TLVencoding {
         return result;
     }
 
-    vector<JsonReading::JsonLinesMap> TLVdecoder::DecodeJsonLinesFromFile(std::ifstream& input) {
-        vector<JsonReading::JsonLinesMap> result;
+    vector<JsonReading::JsonLinePairs> TLVdecoder::DecodeJsonLinesFromFile(std::ifstream& input) {
+        vector<JsonReading::JsonLinePairs> result;
 
         vector<DecodedData> all_data = DecodeFile(input);
 
@@ -136,13 +136,13 @@ namespace TLVencoding {
                 } else {
                     DecodedData val = all_data[++i];
                     if (val.GetType() == DecodedTypes::DECODED_BOOL) {
-                        result.back()[key.GetIntData()] = JsonReading::JsonData(val.GetBoolData());
+                        result.back().push_back(make_pair(key.GetIntData(), JsonReading::JsonData(val.GetBoolData())));
                     } else if (val.GetType() == DecodedTypes::DECODED_INT) {
-                        result.back()[key.GetIntData()] = JsonReading::JsonData(val.GetIntData());
+                        result.back().push_back(make_pair(key.GetIntData(), JsonReading::JsonData(val.GetIntData())));
                     } else if (val.GetType() == DecodedTypes::DECODED_DOUBLE) {
-                        result.back()[key.GetIntData()] = JsonReading::JsonData(val.GetDoubleData());
+                        result.back().push_back(make_pair(key.GetIntData(), JsonReading::JsonData(val.GetDoubleData())));
                     } else {
-                        result.back()[key.GetIntData()] = JsonReading::JsonData(val.GetStringData());
+                        result.back().push_back(make_pair(key.GetIntData(), JsonReading::JsonData(val.GetStringData())));
                     }
                 }
             }

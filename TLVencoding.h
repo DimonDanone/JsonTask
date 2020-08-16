@@ -105,7 +105,7 @@ namespace TLVencoding {
     public:
         TLVdecoder() = default;
 
-        std::vector<JsonReading::JsonLinesMap> DecodeJsonLinesFromFile(std::ifstream& input);
+        std::vector<JsonReading::JsonLinePairs> DecodeJsonLinesFromFile(std::ifstream& input);
 
         JsonReading::JsonKeysMap DecodeJsonKeysFromFile(std::ifstream& input);
 
